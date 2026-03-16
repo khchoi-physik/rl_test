@@ -41,7 +41,7 @@ MIN_IMPROVEMENT = 5.0
 
 main_dir = os.getcwd()
 video_dir = os.path.join(main_dir, "videos")
-model_dir = os.path.join(main_dir, "models")
+model_dir = os.path.join(main_dir, "models") 
 if not os.path.exists(video_dir):
     os.makedirs(video_dir)
 if not os.path.exists(model_dir):
