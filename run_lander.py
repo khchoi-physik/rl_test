@@ -5,14 +5,17 @@ import os, sys
 
 from myQnet import QNetwork
 
+
+
 main_dir = os.getcwd()
-video_dir = os.path.join(main_dir, "videos")
-model_dir = os.path.join(main_dir, "models")
+video_dir = os.path.join(main_dir, "videos/lunar_lander")
+model_dir = os.path.join(main_dir, "models/lunar_lander") 
   
 device = torch.device("cpu")
 
 wind = bool(sys.argv[1]) 
 hidden_dim = int(sys.argv[2])
+num_episodes = int(sys.argv[3])
 
 render_env = gym.make(
     "LunarLander-v3",
@@ -41,7 +44,7 @@ qnet = QNetwork(state_dim, action_dim, hidden_dim=hidden_dim).to(device)
 qnet.load_state_dict(torch.load(os.path.join(model_dir, f"best_lunar_lander_{hidden_dim}.pth")))
 qnet.eval()
 
-for ep in range(10):
+for ep in range(num_episodes):
     state, _ = video_env.reset()
 
     done = False

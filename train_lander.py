@@ -1,4 +1,5 @@
 import gymnasium as gym
+from gymnasium.wrappers import RecordVideo
 from collections import deque
 import numpy as np
 from torch import optim, nn
@@ -40,8 +41,8 @@ IMPROVEMENT_COUNT = 0
 MIN_IMPROVEMENT = 5.0
 
 main_dir = os.getcwd()
-video_dir = os.path.join(main_dir, "videos")
-model_dir = os.path.join(main_dir, "models") 
+video_dir = os.path.join(main_dir, "videos/lunar_lander")
+model_dir = os.path.join(main_dir, "models/lunar_lander") 
 if not os.path.exists(video_dir):
     os.makedirs(video_dir)
 if not os.path.exists(model_dir):
@@ -105,6 +106,35 @@ def train_step(qnet, target_net, buffer, optimizer, batch_size, beta, device):
     optimizer.step()
     return loss.item()
 
+def record(qnet,wind,video_dir,device, eps=3, name_prefix=f"lunar_lander_"):
+    env = gym.make(
+        "LunarLander-v3", 
+        continuous=False, 
+        gravity= -10, 
+        enable_wind=wind, 
+        wind_power=15, 
+        turbulence_power=1.5,
+        render_mode="rgb_array"
+    )
+    env = RecordVideo(
+        env,
+        video_dir,
+        episode_trigger=lambda ep: True,
+        name_prefix=name_prefix
+    )
+    qnet.eval()
+    for ep in range(eps):
+        state, _ = env.reset()
+        done = False
+        while not done:
+            with torch.no_grad():
+                action = qnet(torch.tensor(state, dtype=torch.float32, device=device).unsqueeze(0)).argmax(1).item()
+            next_state, reward, terminated, truncated, _ = env.step(action)
+            done = terminated or truncated
+            state = next_state
+        env.close()
+        qnet.train()
+
 def Evaluate(env, qnet,num_episodes, device):
     rewards = []
     for _ in range(num_episodes):
@@ -132,7 +162,6 @@ for iter in range(1000):
     state = next_state
     if done: 
         state, _ = env.reset()
-
 
 
 optimizer = optim.Adam(qnet.parameters(), lr=5e-4)
@@ -179,9 +208,9 @@ for epi in range(NUM_EPISODES):
             IMPROVEMENT_COUNT = 0
             torch.save(qnet.state_dict(), os.path.join(model_dir, f"best_lunar_lander_{hidden_dim}.pth"))
             print(f"Episode {epi:3d}: Mean reward {mean_eval:8.2f}, Std reward {std_eval:8.2f}, avg loss {avg_loss:8.4f}, epsilon {EPSILON:.3}")
+            record(qnet,wind,video_dir,device, eps=3, name_prefix=f"lunar_lander_{hidden_dim}_at_{epi}")
         else: 
             print(f"No improvement on episode {epi}")
-            IMPROVEMENT_COUNT += 1
         if IMPROVEMENT_COUNT >= PATIENCE:
             print(f"Early stopping on episode {epi}, no improvement in {PATIENCE} episodes")
             break
@@ -197,6 +226,7 @@ plt.xlabel('Episode')
 plt.ylabel('Reward')
 plt.legend()
 plt.savefig(os.path.join(model_dir, f'reward_{hidden_dim}.png'))
+np.save(os.path.join(model_dir, f'reward_{hidden_dim}.npy'), episode_rewards)
 
 plt.plot(ma(episode_losses), c='black', lw=1, label='MA')
 plt.plot(episode_losses, c='gray', alpha=0.5, lw=0.5, label='Loss')
@@ -204,9 +234,11 @@ plt.xlabel('Episode')
 plt.ylabel('Loss')
 plt.legend()
 plt.savefig(os.path.join(model_dir, f'loss_{hidden_dim}.png'))
+np.save(os.path.join(model_dir, f'loss_{hidden_dim}.npy'), episode_losses)
 
-plt.plot(episode_epsilons, c='black', lw=1, label='Epsilon')
+plt.plot(episode_epsilons, c='black', lw=1, label='Epsilon') 
 plt.xlabel('Episode')
 plt.ylabel('Epsilon')
 plt.legend()
 plt.savefig(os.path.join(model_dir, f'epsilon_{hidden_dim}.png'))
+np.save(os.path.join(model_dir, f'epsilon_{hidden_dim}.npy'), episode_epsilons)
